@@ -1,0 +1,46 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Cleanup Artifacts') {
+            steps {
+                script {
+                    // Calculate 2 days in milliseconds
+                    def twoDaysAgo = System.currentTimeMillis() - (2 * 24 * 60 * 60 * 1000)
+
+                    // Get all jobs in Jenkins
+                    def allJobs = Jenkins.instance.getAllItems(AbstractProject.class)
+
+                    allJobs.each { job ->
+                        // Iterate over builds for each job
+                        job.getBuilds().each { build ->
+                            def artifactsDir = build.artifactsDir
+                            def artifacts = artifactsDir.listFiles()
+
+                            artifacts.each { artifact ->
+                                if (artifact.lastModified() < twoDaysAgo) {
+                                    println "Deleting artifact: ${artifact.name} from build ${build.number} in job ${job.name}"
+                                    artifact.delete()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+data "aws_ssm_parameter" "ubuntu_20_04_ami" {
+  name = "/aws/service/ami-amazon-linux-latest/ubuntu-20.04-lts/hvm/ebs-gp2/x86_64/ami-id"
+}
+
+
+#!/bin/bash
+
+# List the last 5 complete commit IDs where docker files are updated
+git log -n 5 --pretty=format:"%H" --name-only --grep='docker\|test/docker' | grep -E '\.docker|test/docker' | sort -u
+
+
+jf rt search --spec="docker-registry/*" --q="name~<your_regex>" --exec="jf rt del " --dry-run=false
